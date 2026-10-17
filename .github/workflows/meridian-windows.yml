@@ -1,0 +1,45 @@
+name: Build Meridian Windows from source ZIP
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Meridian_Editor_v0.14.1_WINDOWS_BUILD_READY.zip'
+permissions:
+  contents: read
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Unpack Meridian source
+        shell: pwsh
+        run: |
+          $archive = 'Meridian_Editor_v0.14.1_WINDOWS_BUILD_READY.zip'
+          if (!(Test-Path $archive)) { throw 'Upload the Meridian source ZIP to the repository root first.' }
+          Expand-Archive -LiteralPath $archive -DestinationPath . -Force
+          if (!(Test-Path 'packaging/build-windows.ps1')) { throw 'Source archive is missing build script.' }
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer and portable ZIP
+        shell: pwsh
+        run: ./packaging/build-windows.ps1
+      - name: Verify outputs
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'release/MeridianEditor_Setup_v0.14.1.exe')) { throw 'Setup EXE missing' }
+          if (!(Test-Path 'release/MeridianEditor_Portable_v0.14.1.zip')) { throw 'Portable ZIP missing' }
+      - name: Upload Windows binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: Meridian-Windows-v0.14.1
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
